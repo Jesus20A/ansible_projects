@@ -1,0 +1,109 @@
+---
+
+- name: Configure shell Environment
+  hosts: test
+  gather_facts: true
+  become: true
+  remote_user: abdias
+# Author: Jesus Salas
+#
+  pre_tasks:
+    - name: Installing prerequisites
+      ansible.builtin.package:
+        name:
+          - git
+          - curl
+          - zsh
+          - lsd
+          - bat
+          - tmux
+          - nfs-common
+          - autofs
+        state: present
+  tasks:
+    - name: Changing default shell to ZSH
+      ansible.builtin.user:
+        name: abdias
+        shell: /usr/bin/zsh
+    - name: Downloading nerd fonts
+      ansible.builtin.get_url:
+        url: https://github.com/ryanoasis/nerd-fonts/releases/download/v3.1.1/Hack.zip
+        dest: /home/abdias/
+        owner: abdias
+        group: abdias
+        mode: '644'
+        decompress: true
+    - name: Creating fonts directory
+      ansible.builtin.file:
+        path: /home/abdias/.local/share/fonts
+        state: directory
+    - name: Unzipping ZIP fonts
+      ansible.builtin.unarchive:
+        dest: /home/abdias/.local/share/fonts
+        owner: abdias
+        group: abdias
+        mode: '644'
+        remote_src: true
+        src: /home/abdias/Hack.zip
+    - name: Downloading and installing oh-my-zsh
+      ansible.builtin.shell:
+        cmd: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      args:
+        chdir: /home/abdias/
+        creates: /home/abdias/.oh-my-zsh/tools/install.sh
+      become_user: abdias
+    - name: Cloning plugins repos
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        dest: "{{ item.dest }}"
+        clone: true
+        depth: "{{ item.depth }}"
+      with_items:
+        - repo: https://github.com/zsh-users/zsh-autosuggestions
+          dest: /home/abdias/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+          depth: 0
+        - repo: https://github.com/zsh-users/zsh-syntax-highlighting.git
+          dest: /home/abdias/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
+          depth: 0
+        - repo: https://github.com/romkatv/powerlevel10k.git
+          dest: /home/abdias/.oh-my-zsh/custom/themes/powerlevel10k
+          depth: 1
+    - name: Mounting NFS backup share
+      ansible.posix.mount:
+        path: /mnt/media-serv/backup
+        src: 192.168.1.9:/mnt/media/backup/
+        state: ephemeral
+        fstype: nfs
+    - name: Copying configuration files
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        mode: '0644'
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+      with_items:
+          - src: /mnt/media-serv/backup/laptop/dotfiles/.zshrc
+            dest: /home/abdias/.zshrc
+            owner: abdias
+            group: abdias
+          - src: /mnt/media-serv/backup/laptop/dotfiles/.tmux.conf
+            dest: /home/abdias/.tmux.conf
+            owner: abdias
+            group: abdias
+          - src: /mnt/media-serv/backup/laptop/dotfiles/auto.master
+            dest: /etc/auto.master
+            owner: root
+            group: root
+          - src: /mnt/media-serv/backup/laptop/dotfiles/auto.nfs
+            dest: /etc/auto.nfs
+            owner: root
+            group: root
+    - name: Reboot host and wait for it to restart
+      ansible.builtin.reboot:
+        msg: "Rebooting the machine"
+        connect_timeout: 5
+        reboot_timeout: 600
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: whoami
