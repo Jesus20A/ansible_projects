@@ -1,0 +1,197 @@
+---
+
+- name: Installing and configuring Prometheus and Grafana
+  become: true
+  hosts: ubuntu
+
+  tasks:
+    - name: Installing Prometheus Monitoring Tool
+      block:
+        - name: Getting the prometheus tar
+          ansible.builtin.get_url:
+            url: https://github.com/prometheus/prometheus/releases/download/v2.46.0/prometheus-2.46.0.linux-amd64.tar.gz
+            dest: /home/abdias/prometheus-2.46.0.linux-amd64.tar.gz
+            checksum: "sha256:d2177ea21a6f60046f9510c828d4f8969628cfd35686780b3898917ef9c268b9"
+            mode: '0644'
+        - name: Add prometheus user
+          ansible.builtin.user:
+            name: prometheus
+            system: true
+            state: "present"
+            create_home: false
+        - name: Create prometheus /var/lib
+          ansible.builtin.file:
+            path: /var/lib/prometheus/
+            state: directory
+            mode: '0755'
+            owner: prometheus
+            group: prometheus
+        - name: Unarchive prometheus tar
+          ansible.builtin.unarchive:
+            remote_src: true
+            src: /home/abdias/prometheus-2.46.0.linux-amd64.tar.gz
+            dest: /var/lib/prometheus/
+            owner: prometheus
+            group: prometheus
+        - name: Create prometheus /etc folder
+          ansible.builtin.file:
+            path: /etc/prometheus/
+            state: directory
+            mode: '0755'
+            owner: prometheus
+            group: prometheus
+        - name: Copy prometheus config file
+          ansible.builtin.copy:
+            src: ../prometheus.yml
+            dest: /etc/prometheus/prometheus.yml
+            mode: '0644'
+            owner: prometheus
+            group: prometheus
+            force: true
+        - name: Copy prometheus bin
+          ansible.builtin.copy:
+            remote_src: true
+            src: "{{ item.src }}"
+            dest: "{{ item.dest }}"
+            mode: '0755'
+            owner: prometheus
+            group: prometheus
+          with_items:
+            - src: /var/lib/prometheus/prometheus-2.46.0.linux-amd64/prometheus
+              dest: /usr/local/bin/prometheus
+            - src: /var/lib/prometheus/prometheus-2.46.0.linux-amd64/promtool
+              dest: /usr/local/bin/promtool
+        - name: Copy prometheus service
+          ansible.builtin.copy:
+            src: ../prometheus.service
+            dest: /etc/systemd/system/
+            mode: '0755'
+            owner: prometheus
+            group: prometheus
+            force: true
+        - name: Check prometheus is running
+          ansible.builtin.systemd:
+            daemon_reload: true
+            name: prometheus.service
+            state: restarted
+            enabled: true
+        - name: Add port 9091 to UFW
+          community.general.ufw:
+            state: enabled
+            proto: tcp
+            port: 9091
+            rule: allow
+    - name: Installing Grafana
+      block:
+        - name: Add grafana apt repository key.
+          ansible.builtin.get_url:
+            url: "https://apt.grafana.com/gpg.key"
+            dest: /etc/apt/trusted.gpg.d/grafana.asc
+            mode: '0644'
+            force: true
+        - name: Add grafana apt repository.
+          ansible.builtin.apt_repository:
+            repo: "deb [signed-by=/etc/apt/trusted.gpg.d/grafana.asc] https://apt.grafana.com stable main"
+            state: present
+            update_cache: true
+        - name: Update apt cache.
+          ansible.builtin.apt:
+            update_cache: true
+        - name: Install grafana
+          ansible.builtin.apt:
+            name: grafana
+            state: present
+        - name: Check if grafana is started and enabled.
+          ansible.builtin.service:
+            name: grafana-server
+            state: started
+            enabled: true
+        - name: Add port 3000 to UFW
+          community.general.ufw:
+            state: enabled
+            proto: tcp
+            port: 3000
+            rule: allow
+
+- name: Installing Node Exporter in all servers
+  become: true
+  hosts: homelab
+
+  pre_tasks:
+    - name: Installing UFW in debian-serv
+      ansible.builtin.apt:
+        update_cache: true
+        name:
+          - ufw
+        state: present
+      when: ansible_facts['hostname'] == "debian-serv"
+    - name: Check if UFW is started and enabled
+      ansible.builtin.service:
+        name: ufw
+        state: started
+        enabled: true
+      when: ansible_facts['hostname'] == "debian-serv"
+    - name: Enable UFW
+      community.general.ufw:
+        state: enabled
+      when: ansible_facts['hostname'] == "debian-serv"
+
+  tasks:
+    - name: Installing Node Exporter
+      block:
+        - name: Getting the node exporter tar
+          ansible.builtin.get_url:
+            url: https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+            dest: /home/abdias/node_exporter-1.6.1.linux-amd64.tar.gz
+            checksum: "sha256:ecc41b3b4d53f7b9c16a370419a25a133e48c09dfc49499d63bcc0c5e0cf3d01"
+            mode: '0644'
+        - name: Add node exporter user
+          ansible.builtin.user:
+            name: node_exporter
+            system: true
+            state: "present"
+            create_home: false
+        - name: Unarchive node exporter tar
+          ansible.builtin.unarchive:
+            remote_src: true
+            src: /home/abdias/node_exporter-1.6.1.linux-amd64.tar.gz
+            dest: /home/abdias/
+            owner: node_exporter
+            group: node_exporter
+        - name: Copy node exporter bin
+          ansible.builtin.copy:
+            remote_src: true
+            src: /home/abdias/node_exporter-1.6.1.linux-amd64/node_exporter
+            dest: /usr/local/bin/node_exporter
+            mode: '0775'
+            owner: node_exporter
+            group: node_exporter
+            force: true
+        - name: Copy node exporter service
+          ansible.builtin.copy:
+            src: ../node-exporter.service
+            dest: /etc/systemd/system/node-exporter.service
+            mode: '0755'
+            owner: node_exporter
+            group: node_exporter
+            force: true
+        - name: Check node exporter is running
+          ansible.builtin.systemd:
+            daemon_reload: true
+            name: node-exporter.service
+            state: restarted
+            enabled: true
+        - name: Add port 9100 to firewalld
+          ansible.posix.firewalld:
+            port: 9100/tcp
+            state: enabled
+            permanent: true
+            immediate: true
+          when: ansible_facts['distribution'] == "Rocky" or ansible_facts['distribution'] == "openSUSE Leap"
+        - name: Add port 9100 to UFW
+          community.general.ufw:
+            state: enabled
+            proto: tcp
+            port: 9100
+            rule: allow
+          when: ansible_facts['distribution'] == "Ubuntu" or ansible_facts['distribution'] == "Debian"
