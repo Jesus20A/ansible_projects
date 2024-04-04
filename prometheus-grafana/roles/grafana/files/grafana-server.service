@@ -1,0 +1,12 @@
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=grafana
+Group=grafana
+Type=simple
+ExecStart=/var/lib/grafana/bin/grafana server --homepath /var/lib/grafana/
+
+[Install]
+WantedBy=multi-user.target

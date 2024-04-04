@@ -1,0 +1,104 @@
+---
+# tasks file for prometheus
+- name: Getting the prometheus tar
+  ansible.builtin.get_url:
+    url: "{{ prometheus_url }}"
+    dest: "{{ tmp }}"
+    checksum: "{{ prometheus_checksum }}"
+    mode: '0644'
+- name: Ensure group prometheus exists
+  ansible.builtin.group:
+    name: prometheus
+    state: present
+- name: Add prometheus user
+  ansible.builtin.user:
+    name: prometheus
+    group: prometheus
+    system: true
+    state: "present"
+    create_home: false
+- name: Create prometheus /var/lib
+  ansible.builtin.file:
+    path: /var/lib/prometheus/
+    state: directory
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+- name: Find file
+  ansible.builtin.command:
+    cmd: "find {{ tmp }} -type f -name prometheus*.tar.gz"
+  register: tar_file
+- name: Unarchive prometheus tar
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: "{{ tar_file.stdout }}"
+    dest: "{{ tmp }}"
+    owner: prometheus
+    group: prometheus
+- name: Find directory
+  ansible.builtin.command:
+    cmd: "find {{ tmp }} -type d -name prometheus-*linux-amd64"
+  register: prometheus_dir
+- name: Copying files
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ prometheus_dir.stdout }}/"
+    dest: /var/lib/prometheus/
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+- name: Create prometheus /etc folder
+  ansible.builtin.file:
+    path: /etc/prometheus/
+    state: directory
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+- name: Copy prometheus config file
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/prometheus.yml"
+    dest: /etc/prometheus/
+    mode: '0644'
+    owner: prometheus
+    group: prometheus
+    force: true
+- name: Copy prometheus bin
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+  with_items:
+    - src: /var/lib/prometheus/prometheus
+      dest: /usr/local/bin/prometheus
+    - src: /var/lib/prometheus/promtool
+      dest: /usr/local/bin/promtool
+- name: Copy prometheus service
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/prometheus.service"
+    dest: /etc/systemd/system/
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+    force: true
+- name: Check prometheus is running
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: prometheus.service
+    state: started
+    enabled: true
+- name: Add port 9091 to firewalld
+  ansible.posix.firewalld:
+    port: 9091/tcp
+    state: enabled
+    permanent: true
+    immediate: true
+- name: Deleting downloaded files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items: 
+    - dir: "{{ prometheus_dir.stdout }}"
+    - file: "{{ tar_file.stdout }}"

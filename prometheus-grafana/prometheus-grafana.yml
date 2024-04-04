@@ -1,0 +1,27 @@
+---
+
+- name: Installing Prometheus and Grafana
+  become: true
+  hosts: ubuntu
+  gather_facts: true
+
+  roles:
+    - firewalld
+    - prometheus
+    - grafana
+
+- name: Installing Node Exporter
+  become: true
+  hosts: testing
+  gather_facts: true
+
+  pre_tasks:
+    - name: Update cache if debian
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_facts['distribution'] == "Debian"
+
+  roles:
+    - firewalld
+    - node-exporter
+

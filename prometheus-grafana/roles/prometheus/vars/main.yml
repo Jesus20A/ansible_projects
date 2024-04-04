@@ -1,0 +1,6 @@
+---
+# vars file for prometheus
+
+prometheus_url: https://github.com/prometheus/prometheus/releases/download/v2.49.1/prometheus-2.49.1.linux-amd64.tar.gz
+prometheus_checksum: sha256:93460f66d17ee70df899e91db350d9705c20b1576800f96acbd78fa004e7dc07
+tmp: /home/vagrant/

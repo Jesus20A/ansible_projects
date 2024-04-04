@@ -1,0 +1,6 @@
+---
+# vars file for grafana
+
+grafana_url: https://dl.grafana.com/oss/release/grafana-10.3.1.linux-amd64.tar.gz
+grafana_checksum: sha256:f464241330b1d70546e992b89cfdaf8880c8898ac688d96257a74ffccccacbde
+tmp: /home/vagrant/

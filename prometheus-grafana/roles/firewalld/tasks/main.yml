@@ -1,0 +1,21 @@
+---
+- name: Gather the package facts
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: Check if package called firewalld is installed
+  ansible.builtin.debug:
+    msg: "{{ ansible_facts.packages['firewalld'] | length }} versions of firewalld installed"
+  when: "'firewalld' in ansible_facts.packages"
+
+- name: Install firewalld
+  ansible.builtin.package:
+    name: firewalld
+    state: present
+  when: "not 'firewalld' in ansible_facts.packages"
+
+- name: Check if firewalld is started
+  ansible.builtin.systemd:
+    name: firewalld
+    state: started
+    enabled: true

@@ -15,32 +15,27 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.define "Ubuntu22" do |serv1|
     serv1.vm.box = "generic/ubuntu2204"
     serv1.vm.hostname = "ubuntu-serv"
-    serv1.vm.network :private_network, ip: "192.168.50.4"
+    serv1.vm.network :private_network, ip: "192.168.30.4"
   end
 
   # Debian server.
   config.vm.define "debian12" do |serv2|
     serv2.vm.box = "debian/bookworm64"
     serv2.vm.hostname = "debian-serv"
-    serv2.vm.network :private_network, ip: "192.168.50.5"
+    serv2.vm.network :private_network, ip: "192.168.30.5"
   end
 
   # Rocky server.
   config.vm.define "rocky9" do |serv3|
     serv3.vm.box = "rockylinux/9"
     serv3.vm.hostname = "rocky-serv"
-    serv3.vm.network :private_network, ip: "192.168.50.6"
+    serv3.vm.network :private_network, ip: "192.168.30.6"
   end
 
   # OpenSUSE Leap 15.5.
   config.vm.define "suse_leap15.5" do |serv4|
     serv4.vm.box = "opensuse/Leap-15.5.x86_64"
     serv4.vm.hostname = "suse-serv"
-    serv4.vm.network :private_network, ip: "192.168.50.7"
-  end
-  # Ansible provisioner.
-  config.vm.provision :ansible do |ansible|
-    ansible.inventory_path = "./provisioning/inventory"
-    ansible.playbook = "./provisioning/prometheus-grafana.yml"
+    serv4.vm.network :private_network, ip: "192.168.30.7"
   end
 end

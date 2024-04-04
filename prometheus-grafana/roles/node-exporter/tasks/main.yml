@@ -1,0 +1,69 @@
+---
+- name: Getting the node exporter tar
+  ansible.builtin.get_url:
+    url: "{{ node_exporter_url }}"
+    dest: "{{ tmp }}"
+    checksum: "{{ node_exporter_checksum }}"
+    mode: '0644'
+- name: Ensure group node_exporter exists
+  ansible.builtin.group:
+    name: node_exporter
+    state: present
+- name: Add node exporter user
+  ansible.builtin.user:
+    name: node_exporter
+    group: node_exporter
+    system: true
+    state: "present"
+    create_home: false
+- name: Find file
+  ansible.builtin.command:
+    cmd: "find {{ tmp }} -type f -name node_exporter*.tar.gz"
+  register: tar_file
+- name: Unarchive node exporter tar
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: "{{ tar_file.stdout }}"
+    dest: "{{ tmp }}"
+    owner: node_exporter
+    group: node_exporter
+- name: Find directory
+  ansible.builtin.command:
+    cmd: "find {{ tmp }} -type d -name node_exporter*"
+  register: node_dir
+- name: Copy node exporter bin
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ node_dir.stdout }}/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: '0775'
+    owner: node_exporter
+    group: node_exporter
+    force: true
+- name: Copy node exporter service
+  ansible.builtin.copy:
+    src: "{{ role_path }}/files/node-exporter.service"
+    dest: /etc/systemd/system/node-exporter.service
+    mode: '0755'
+    owner: root
+    group: root
+    force: true
+- name: Check node exporter is running
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: node-exporter.service
+    state: started
+    enabled: true
+- name: Add port 9100 to firewalld
+  ansible.posix.firewalld:
+    port: 9100/tcp
+    state: enabled
+    permanent: true
+    immediate: true
+- name: Deleting downloaded files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items: 
+    - dir: "{{ node_dir.stdout }}"
+    - file: "{{ tar_file.stdout }}"
